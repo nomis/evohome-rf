@@ -12,9 +12,7 @@ import termios
 import time
 import yaml
 
-IP6_GROUP = "ff02::114"
-SRC_PORT = 17734
-DST_PORT = 1986
+from evohome_net import *
 
 def main_loop(device, interface, debug):
 	with serial.Serial(device, 115200) as input:
@@ -27,6 +25,7 @@ def main_loop(device, interface, debug):
 		fcntl.fcntl(input.fd, fcntl.F_SETFL, 1)
 
 		with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as output:
+			output.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			output.bind(("", SRC_PORT))
 			output.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 1)
 
@@ -38,10 +37,11 @@ def main_loop(device, interface, debug):
 
 			while True:
 				for line in list(filter(None, os.read(input.fd, 4096).replace(b"\r", b"").split(b"\n"))):
-					if not line.startswith("#"):
+					if not line.startswith(b"#"):
 						now = time.time()
+						if debug:
+							syslog.syslog(line.decode("ascii", "replace"))
 						output.sendto(str(now).encode("ascii") + b"\n" + line, (IP6_GROUP, DST_PORT))
-						syslog.syslog(line.decode("ascii", "replace"))
 
 
 if __name__ == "__main__":
