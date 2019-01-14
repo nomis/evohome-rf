@@ -241,11 +241,11 @@ class EvohomeState:
 				zone = data[0]
 				self.set_value(now, ["controller", dev2, "zones", zone, "battery", dev0], battery)
 
-		if dev2.actuator:
+		if dev0.actuator:
 			self.set_value(now, ["actuator", dev0, "battery"], battery)
-		elif dev2.sensor:
+		elif dev0.sensor:
 			self.set_value(now, ["sensor", dev0, "battery"], battery)
-		elif dev2.relay:
+		elif dev0.relay:
 			self.set_value(now, ["relay", dev0, "battery"], battery)
 
 	def process_message(self, now, rssi, type, dev0, dev1, dev2, cmd, length, data):
