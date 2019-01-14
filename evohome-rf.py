@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import argparse
+import array
 import fcntl
 import os
+import select
 import serial
 import socket
 import struct
@@ -16,6 +18,21 @@ from evohome_net import *
 
 def main_loop(device, interface, debug):
 	with serial.Serial(device, 115200) as input:
+		# Configure baud rate
+		TCGETS2 = 0x802C542A
+		TCSETS2 = 0x402C542B
+		BOTHER = 0o010000
+
+		buf = array.array('i', [0] * 64)
+		fcntl.ioctl(input.fd, TCGETS2, buf)
+		buf[2] &= ~termios.CBAUD
+		buf[2] |= BOTHER
+		buf[9] = buf[10] = 250000
+		try:
+			fcntl.ioctl(input.fd, TCSETS2, buf)
+		except IOError:
+			raise ValueError("Failed to set baud rate")
+
 		# Configure read() to block until a whole line is received
 		attrs = termios.tcgetattr(input.fd)
 		attrs[3] |= termios.ICANON
@@ -30,18 +47,36 @@ def main_loop(device, interface, debug):
 			output.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 1)
 
 			# Transmit on a specific interface
-			mcast_if = struct.pack("@i", socket.if_nametoindex(interface))
+			ifidx = socket.if_nametoindex(interface)
+			mcast_if = struct.pack("@i", ifidx)
 			output.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, mcast_if)
 
 			systemd.daemon.notify("READY=1")
+			buffer = b""
 
 			while True:
-				for line in list(filter(None, os.read(input.fd, 4096).replace(b"\r", b"").split(b"\n"))):
-					if not line.startswith(b"#"):
-						now = time.time()
+				(rlist, wlist, xlist) = select.select([input.fd, output], [], [])
+
+				if input.fd in rlist:
+					buffer += os.read(input.fd, 65536)
+					lines = buffer.split(b"\r\n")
+					if not buffer.endswith(b"\r\n"):
+						buffer = lines[-1]
+						lines = lines[:-1]
+					else:
+						buffer = b""
+
+					now = time.time()
+					for line in filter(None, lines):
 						if debug:
 							syslog.syslog(line.decode("ascii", "replace"))
-						output.sendto(str(now).encode("ascii") + b"\n" + line, (IP6_GROUP, DST_PORT))
+						if not line.startswith(b"#"):
+							output.sendto(str(now).encode("ascii") + b"\n" + line, (IP6_GROUP, DST_PORT))
+
+				if output in rlist:
+					(packet, address) = output.recvfrom(65536)
+					if address[3] == ifidx:
+						os.write(input.fd, packet)
 
 
 if __name__ == "__main__":

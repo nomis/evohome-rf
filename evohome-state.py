@@ -320,7 +320,7 @@ def main_loop(interface, source):
 		state = EvohomeState()
 
 		while True:
-			(packet, address) = input.recvfrom(4096)
+			(packet, address) = input.recvfrom(65536)
 			address = (address[0].split("%")[0],) + address[1:]
 			if address == source:
 				(now, packet) = packet.decode("ascii", "replace").split("\n")
