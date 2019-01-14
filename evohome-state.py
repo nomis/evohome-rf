@@ -100,7 +100,7 @@ class EvohomeState:
 		self.load_state()
 
 	def process_controller_interval(self, now, type, dev0, dev1, dev2, data):
-		if type != "I" or dev0 is None:
+		if dev0 is None:
 			return
 
 		if dev0.controller:
@@ -112,7 +112,7 @@ class EvohomeState:
 				self.set_value(now, ["controller", dev0, "interval_s"], seconds)
 
 	def process_zone_temp(self, now, type, dev0, dev1, dev2, data):
-		if type != "I" or dev0 is None:
+		if dev0 is None:
 			return
 
 		if dev0.controller:
@@ -135,7 +135,7 @@ class EvohomeState:
 				self.set_value(now, ["sensor", dev0, "temp_c"], temp)
 
 	def process_set_point(self, now, type, dev0, dev1, dev2, data):
-		if type != "I" or dev0 is None or dev2 is None:
+		if dev0 is None or dev2 is None:
 			return
 
 		if dev0.controller:
@@ -159,7 +159,7 @@ class EvohomeState:
 				self.set_value(now, ["controller", dev2, "zones", zone, "set_point_c"], temp)
 
 	def process_set_point_override(self, now, type, dev0, dev1, dev2, data):
-		if type != "I" or dev0 is None:
+		if dev0 is None:
 			return
 
 		if dev0.controller:
@@ -180,7 +180,7 @@ class EvohomeState:
 
 
 	def process_any_demand(self, now, type, dev0, dev1, dev2, data):
-		if type != "I" or dev0 is None or dev2 is None or not dev2.controller:
+		if dev0 is None or dev2 is None or not dev2.controller:
 			return
 
 		if dev0.controller:
@@ -205,7 +205,7 @@ class EvohomeState:
 		self.process_any_demand(now, type, dev0, dev1, dev2, data)
 
 	def process_zone_window(self, now, type, dev0, dev1, dev2, data):
-		if type != "I" or dev0 is None or dev2 is None:
+		if dev0 is None or dev2 is None:
 			return
 
 		if dev0.sensor and dev2.controller:
@@ -217,7 +217,7 @@ class EvohomeState:
 			self.set_value(now, ["controller", dev2, "zones", zone, "open_window"], window)
 
 	def process_relay_state(self, now, type, dev0, dev1, dev2, data):
-		if type != "I" or dev0 is None:
+		if dev0 is None:
 			return
 
 		if dev0.relay:
@@ -228,7 +228,7 @@ class EvohomeState:
 			self.set_value(now, ["relay", dev0, "demand"], demand)
 
 	def process_battery_info(self, now, type, dev0, dev1, dev2, data):
-		if type != "I" or dev0 is None or dev2 is None:
+		if dev0 is None or dev2 is None:
 			return
 
 		if len(data) != 3:
@@ -260,6 +260,9 @@ class EvohomeState:
 			return
 
 		if cmd not in self.commands:
+			return
+
+		if type not in ["I", "RP"]:
 			return
 
 		self.commands[cmd](now, type, dev0, dev1, dev2, bytes.fromhex(data))
