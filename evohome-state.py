@@ -71,6 +71,8 @@ def parse_demand(data):
 
 def parse_datetime(data):
 	(mins, hour, day, month, year) = struct.unpack("!BBBBH", data)
+	if year == 0xFFFF or month == 0xFF or day == 0xFF or hour == 0xFF or mins == 0xFF:
+		return None
 	is_dst = time.localtime().tm_isdst == 1
 	return local_tz.localize(datetime.datetime(year, month, day, hour, mins), is_dst=is_dst)
 
@@ -93,6 +95,7 @@ class EvohomeState:
 			0x1F09: self.process_controller_interval,
 			0x2309: self.process_set_point,
 			0x2349: self.process_set_point_override,
+			0x2E04: self.process_controller_mode,
 			0x30C9: self.process_zone_temp,
 			0x3150: self.process_zone_demand,
 			0x3EF0: self.process_relay_state,
@@ -110,6 +113,21 @@ class EvohomeState:
 			seconds = parse_seconds(data[1:])
 			if seconds is not None:
 				self.set_value(now, ["controller", dev0, "interval_s"], seconds)
+
+	def process_controller_mode(self, now, type, dev0, dev1, dev2, data):
+		if dev0 is None:
+			return
+
+		if dev0.controller:
+			if len(data) != 8:
+				return
+
+			mode = { 0: "normal", 1: "off", 2: "economy", 3: "away", 4: "day off", 7: "custom" }.get(data[0], "unknown")
+			until = parse_datetime(data[1:7])
+			persist = { 0: "permanent", 1: "temporary" }.get(data[7], "unknown")
+			self.set_value(now, ["controller", dev0, "mode", "state"], mode)
+			self.set_value(now, ["controller", dev0, "mode", "until"], until)
+			self.set_value(now, ["controller", dev0, "mode", "persist"], persist)
 
 	def process_zone_temp(self, now, type, dev0, dev1, dev2, data):
 		if dev0 is None:
