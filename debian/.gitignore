@@ -1,0 +1,6 @@
+debhelper-build-stamp
+files
+tmp/
+evohome-rf/
+*.substvars
+*.log
