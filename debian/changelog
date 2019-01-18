@@ -1,3 +1,10 @@
+evohome-rf (3) xenial; urgency=medium
+
+  * Revert architecture
+  * Bind to a specific IP
+
+ -- Simon Arlott <ubuntu@sa.me.uk>  Fri, 18 Jan 2019 16:17:33 +0000
+
 evohome-rf (2) xenial; urgency=medium
 
   * Use correct architecture

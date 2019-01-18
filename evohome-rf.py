@@ -16,7 +16,7 @@ import yaml
 
 from evohome_net import *
 
-def main_loop(device, interface, debug):
+def main_loop(device, interface, ip, debug):
 	with serial.Serial(device, 115200) as input:
 		# Configure baud rate
 		TCGETS2 = 0x802C542A
@@ -43,7 +43,7 @@ def main_loop(device, interface, debug):
 
 		with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as output:
 			output.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-			output.bind(("", SRC_PORT))
+			output.bind((ip, SRC_PORT))
 			output.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 1)
 
 			# Transmit on a specific interface
@@ -84,7 +84,8 @@ if __name__ == "__main__":
 	parser.add_argument("-d", "--debug", action="store_true", help="enable debug")
 	parser.add_argument("-l", "--line", metavar="DEVICE", type=str, required=True, help="serial device to open")
 	parser.add_argument("-i", "--interface", metavar="INTERFACE", type=str, required=True, help="network interface to use")
+	parser.add_argument("-b", "--bind", metavar="IP", type=str, required=True, help="IP address to use")
 	args = parser.parse_args()
 
 	syslog.openlog("evohome-rf")
-	main_loop(args.line, args.interface, args.debug)
+	main_loop(args.line, args.interface, args.ip, args.debug)
