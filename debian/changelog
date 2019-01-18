@@ -1,3 +1,9 @@
+evohome-rf (4) xenial; urgency=medium
+
+  * Fix
+
+ -- Simon Arlott <ubuntu@sa.me.uk>  Fri, 18 Jan 2019 16:51:09 +0000
+
 evohome-rf (3) xenial; urgency=medium
 
   * Revert architecture

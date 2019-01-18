@@ -88,4 +88,4 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 
 	syslog.openlog("evohome-rf")
-	main_loop(args.line, args.interface, args.ip, args.debug)
+	main_loop(args.line, args.interface, args.bind, args.debug)
