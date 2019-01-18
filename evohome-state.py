@@ -6,7 +6,7 @@ import os
 import re
 import socket
 import struct
-import syslog
+import systemd.daemon
 import time
 import tzlocal
 import yaml
@@ -340,6 +340,8 @@ def main_loop(interface, source):
 		source = (socket.inet_ntop(socket.AF_INET6, socket.inet_pton(socket.AF_INET6, source)), SRC_PORT, 0, ifidx)
 		state = EvohomeState()
 
+		systemd.daemon.notify("READY=1")
+
 		while True:
 			(packet, address) = input.recvfrom(65536)
 			address = (address[0].split("%")[0],) + address[1:]
@@ -358,5 +360,4 @@ if __name__ == "__main__":
 	parser.add_argument("-s", "--source", metavar="IP", type=str, required=True, help="source IP address")
 	args = parser.parse_args()
 
-	syslog.openlog("evohome-state")
 	main_loop(args.interface, args.source)
