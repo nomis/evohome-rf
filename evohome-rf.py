@@ -42,12 +42,13 @@ def main_loop(device, interface, ip, debug):
 		fcntl.fcntl(input.fd, fcntl.F_SETFL, 1)
 
 		with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as output:
-			output.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-			output.bind((ip, SRC_PORT))
-			output.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 1)
-
 			# Transmit on a specific interface
 			ifidx = socket.if_nametoindex(interface)
+
+			output.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+			output.bind((ip, SRC_PORT, 0, ifidx))
+			output.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_HOPS, 1)
+
 			mcast_if = struct.pack("@i", ifidx)
 			output.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, mcast_if)
 
