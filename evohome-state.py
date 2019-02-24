@@ -15,14 +15,8 @@ from evohome_net import *
 
 
 socket.MCAST_JOIN_SOURCE_GROUP = 46
-re_message = re.compile(r"(?P<rssi>[0-9]{3}|---) +(?P<type>I|RQ|RP|W) +--- +(?P<dev0>[0-9]{2}:[0-9]{6}|--:------) +(?P<dev1>[0-9]{2}:[0-9]{6}|--:------) +(?P<dev2>[0-9]{2}:[0-9]{6}|--:------) +(?P<cmd>[0-9A-F]{4}) +(?P<length>[0-9]{3}) +(?P<data>(?:[0-9A-F]{2})+)")
 
 state_file = "/dev/shm/evohome.state"
-
-cls_controller = [1]
-cls_sensor = [4, 34]
-cls_actuator = [4]
-cls_relay = [13]
 
 local_tz = tzlocal.get_localzone()
 
@@ -103,10 +97,10 @@ class EvohomeState:
 		self.load_state()
 
 	def process_controller_interval(self, now, type, dev0, dev1, dev2, data):
-		if dev0 is None:
+		if dev0 is None or dev2 is None:
 			return
 
-		if dev0.controller:
+		if dev0.controller and dev2.controller:
 			if len(data) != 3:
 				return
 

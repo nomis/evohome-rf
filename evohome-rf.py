@@ -77,7 +77,10 @@ def main_loop(device, interface, ip, debug):
 				if output in rlist:
 					(packet, address) = output.recvfrom(65536)
 					if address[3] == ifidx:
-						os.write(input.fd, packet)
+						while len(packet) > 0:
+							os.write(input.fd, packet[0:16])
+							packet = packet[16:]
+							time.sleep(0.002)
 
 
 if __name__ == "__main__":
