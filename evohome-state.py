@@ -277,6 +277,15 @@ class EvohomeState:
 		if type not in ["I", "RP"]:
 			return
 
+		if dev0.controller:
+			self.set_value(now, ["controller", dev0, "alive"], now)
+		elif dev0.actuator:
+			self.set_value(now, ["actuator", dev0, "alive"], now)
+		elif dev0.sensor:
+			self.set_value(now, ["sensor", dev0, "alive"], now)
+		elif dev0.relay:
+			self.set_value(now, ["relay", dev0, "alive"], now)
+
 		self.commands[cmd](now, type, dev0, dev1, dev2, bytes.fromhex(data))
 		self.save_state()
 
