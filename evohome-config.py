@@ -69,10 +69,10 @@ class EvohomeConfig:
 
 		self.addr = (socket.inet_ntop(socket.AF_INET6, socket.inet_pton(socket.AF_INET6, source)), SRC_PORT, 0, ifidx)
 
-	def make_request(self, cmd, data, timeout=5, attempts=10):
-		tx_packet = "RQ - {0} {1} - {2:04x} {3:03d} {4}\r\n".format(
+	def make_request(self, type, cmd, data, timeout=10, attempts=3):
+		tx_packet = "{5} - {0} {1} - {2:04x} {3:03d} {4}\r\n".format(
 			self.gateway, self.controller, cmd,
-			len(data), codecs.encode(data, "hex").decode("ascii"))
+			len(data), codecs.encode(data, "hex").decode("ascii").upper(), type)
 
 		result = None
 		done = False
@@ -101,26 +101,26 @@ class EvohomeConfig:
 						if match:
 							match = match.groupdict()
 							self.parse_message(match)
-							if (match["type"] == "RQ" and match["dev0"] == self.gateway
+							if (match["type"] == type and match["dev0"] == self.gateway
 									and match["dev1"] == self.controller
 									and match["cmd"] == cmd):
 								sent = True
-							if (match["type"] == "RP" and match["dev0"] == self.controller
+							if (match["type"] == {"RQ": "RP", "W": "I"}.get(type) and match["dev0"] == self.controller
 									and match["dev1"] == self.gateway
 									and match["cmd"] == cmd):
 								result = self.process_message(**match)
 								done = True
-								time.sleep(5)
+								time.sleep(2)
 
 		return (done, result)
 
-	def request_zones(self, zones=None):
+	def get_zones(self, zones=None):
 		if zones is None:
 			zones = range(0, 256)
 
 		good_zones = []
 		for zone in zones:
-			(ok, result) = self.make_request(0x0004, struct.pack("@BB", zone, 0))
+			(ok, result) = self.make_request("RQ", 0x0004, struct.pack("@BB", zone, 0))
 			if not ok:
 				return
 			if not result:
@@ -133,7 +133,7 @@ class EvohomeConfig:
 			self.schedule_block = 1
 			self.schedule_data = b""
 
-			(ok, result) = self.make_request(0x0404, struct.pack("@BBBBBBB", zone, 32, 0, 8, 0, 1, total))
+			(ok, result) = self.make_request("RQ", 0x0404, struct.pack("@BBBBBBB", zone, 32, 0, 8, 0, 1, total))
 			if not ok:
 				return
 			if not result:
@@ -142,7 +142,7 @@ class EvohomeConfig:
 			total = self.schedule_total
 
 			for block in range(2, total + 1):
-				(ok, result) = self.make_request(0x0404, struct.pack("@BBBBBBB", zone, 32, 0, 8, 0, block, total))
+				(ok, result) = self.make_request("RQ", 0x0404, struct.pack("@BBBBBBB", zone, 32, 0, 8, 0, block, total))
 				if not ok:
 					return
 				if not result:
@@ -151,11 +151,52 @@ class EvohomeConfig:
 			self.set_value(["zone", zone, "schedule"], list(self.decode_schedule(self.schedule_data)))
 			self.save_config()
 
+	def set_zones(self, zones=None):
+		if zones is None:
+			zones = range(0, 256)
+
+		good_zones = []
+		for zone in zones:
+			name = self.config.get("zone", {}).get(zone, {}).get("name")
+			if name is None:
+				continue
+			name = name.encode("ascii", "replace")[0:20]
+			name += b"\x00" * (20 - len(name))
+			(ok, result) = self.make_request("W", 0x0004, struct.pack("@BB", zone, 0) + name)
+			if not ok:
+				return
+			if not result:
+				break
+			good_zones.append(zone)
+
+		for zone in good_zones:
+			schedule = self.config.get("zone", {}).get(zone, {}).get("schedule")
+			if schedule is None:
+				continue
+			schedule_data = self.encode_schedule(zone, schedule)
+			block_size = 41
+			total = len(schedule_data) // block_size
+			if len(schedule_data) % block_size != 0:
+				total += 1
+			self.schedule_total = total
+
+			for block in range(1, total + 1):
+				data = schedule_data[(block - 1) * block_size:block * block_size]
+				self.schedule_block = block
+				self.schedule_data = data
+				padding = b"" # b"\x00" * (block_size - len(data))
+
+				(ok, result) = self.make_request("W", 0x0404, struct.pack("@BBBBBBB", zone, 32, 0, 8, len(data), block, total) + data + padding)
+				if not ok:
+					return
+				if not result:
+					return
+
 	def decode_schedule(self, data):
 		data = zlib.decompress(data)
 
 		for record in [data[i:i+20] for i in range(0, len(data), 20)]:
-			(day, time, temp, unknown) = struct.unpack("<xxxxxxxxBxxxHxxHH", record)
+			(zone, day, time, temp) = struct.unpack("<xxxxLLLHxx", record)
 			day = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][day]
 			hours = time // 60
 			minutes = time % 60
@@ -163,13 +204,29 @@ class EvohomeConfig:
 
 			yield { "day": day, "time": "{0:02d}:{1:02d}".format(hours, minutes), "temp": temp }
 
+	def encode_schedule(self, zone, records):
+		data = b""
+
+		for record in records:
+			day = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].index(record["day"])
+			time = [int(x) for x in record["time"].split(":")]
+			time = time[0] * 60 + time[1]
+			temp = int(record["temp"] * 100)
+
+			data += struct.pack("<xxxxLLLHxx", zone, day, time, temp)
+
+		cobj = zlib.compressobj(level=9, wbits=14)
+		data = cobj.compress(data)
+		data += cobj.flush()
+		return data
+
 	def process_zone_name(self, type, dev0, dev1, dev2, data):
 		if len(data) != 22:
 			return False
 
 		if data[2:] == b"\x7F" * 20:
 			return False
-		
+
 		zone = data[0]
 		name = data[2:].decode("ascii", "replace").rstrip("\0")
 		self.set_value(["zone", zone, "name"], name)
@@ -185,17 +242,34 @@ class EvohomeConfig:
 		block = data[5]
 		blocks = data[6]
 
-		if not block or not blocks:
-			return False
+		if type == "RP":
+			if size != len(data[7:]):
+				return False
 
-		if size != len(data[7:]):
-			return False
+			if not block or not blocks:
+				return False
 
-		self.schedule_total = blocks
-		if self.schedule_block == block:
-			self.schedule_data += data[7:]
-			self.schedule_block += 1
-			return True
+			self.schedule_total = blocks
+			if self.schedule_block == block:
+				self.schedule_data += data[7:]
+				self.schedule_block += 1
+				return True
+		elif type == "I":
+			if len(data) != 7:
+				return False
+
+			if block != self.schedule_block:
+				return False
+
+			if size != len(self.schedule_data):
+				return False
+
+			if block < self.schedule_total:
+				if blocks == self.schedule_total:
+					return True
+			elif block == self.schedule_total:
+				if blocks == 0: # 0xFF == failure
+					return True
 
 		return False
 
@@ -215,7 +289,7 @@ class EvohomeConfig:
 		if cmd not in self.commands:
 			return False
 
-		if type != "RP":
+		if type not in ["RP", "I"]:
 			return False
 
 		if dev0 != self.controller:
@@ -263,7 +337,16 @@ if __name__ == "__main__":
 	parser.add_argument("-c", "--controller", metavar="DEVICE", type=str, required=True, help="controller device")
 	parser.add_argument("-f", "--filename", metavar="FILENAME", type=str, required=True, help="output file")
 	parser.add_argument("-z", "--zone", metavar="ZONE", type=int, action="append", help="output file")
+	subparsers = parser.add_subparsers(dest="action")
+	get = subparsers.add_parser("get", help="Get config")
+	set = subparsers.add_parser("set", help="Set config")
 	args = parser.parse_args()
 
 	config = EvohomeConfig(args.interface, args.source, args.controller, args.filename)
-	config.request_zones(args.zone)
+	if args.action == "get":
+		config.get_zones(args.zone)
+	elif args.action == "set":
+		config.set_zones(args.zone)
+	else:
+		print("No action specified")
+		sys.exit(2)
