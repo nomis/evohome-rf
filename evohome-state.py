@@ -182,7 +182,19 @@ class EvohomeState:
 
 			id = int(data[2])
 
-			if id == 5:
+			if id == 3:
+				# Slave configuration
+				slave_flags = int(data[3])
+				self.set_value(now, ["opentherm", dev0, "config", "dhw_present"], (slave_flags & 0x01) != 0)
+				self.set_value(now, ["opentherm", dev0, "config", "control_type"], "modulating" if (slave_flags & 0x02) == 0 else "on/off")
+				self.set_value(now, ["opentherm", dev0, "config", "cooling"], (slave_flags & 0x04) != 0)
+				self.set_value(now, ["opentherm", dev0, "config", "dhw_type"], "instantaneous" if (slave_flags & 0x10) == 0 else "storage tank")
+				self.set_value(now, ["opentherm", dev0, "config", "pump_control"], (slave_flags & 0x20) == 0)
+				self.set_value(now, ["opentherm", dev0, "config", "ch2_present"], (slave_flags & 0x40) != 0)
+				# Slave MemberID code
+				slave_id = int(data[4])
+				self.set_value(now, ["opentherm", dev0, "id"], slave_id)
+			elif id == 5:
 				# Application-specific fault flags
 				fault_flags = int(data[3])
 				self.set_value(now, ["opentherm", dev0, "boiler", "faults", "service_request"], (fault_flags & 0x01) != 0)
@@ -195,6 +207,13 @@ class EvohomeState:
 				# OEM fault code
 				fault_code = int(data[4])
 				self.set_value(now, ["opentherm", dev0, "boiler", "faults", "oem_code"], fault_code)
+			elif id == 15:
+				# Maximum boiler capacity
+				kw = int(data[3])
+				self.set_value(now, ["opentherm", dev0, "boiler", "burner", "max_kw"], kw)
+				# Minimum modulation level
+				level = int(data[4])
+				self.set_value(now, ["opentherm", dev0, "ch", "modulation", "min_level"], level)
 			elif id == 17:
 				# Relative Modulation Level
 				level = parse_f8_8(data[3:5])
@@ -229,6 +248,60 @@ class EvohomeState:
 					temp = None
 
 				self.set_value(now, ["opentherm", dev0, "ch", "flow", "return_c"], temp)
+			elif id == 56:
+				# Domestic hot water temperature setpoint
+				temp = parse_f8_8(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "dhw", "flow", "set_point_c"], temp)
+			elif id == 57:
+				# Maximum allowable CH water setpoint
+				temp = parse_f8_8(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "ch", "flow", "max_set_point_c"], temp)
+			elif id == 113:
+				pass
+			elif id == 114:
+				pass
+			elif id == 115:
+				# OEM diagnostic code
+				diagnostic_code = parse_u16(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "boiler", "diagnostic", "oem_code"], diagnostic_code)
+			elif id == 116:
+				# Burner starts
+				starts = parse_u16(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "boiler", "burner", "starts"], starts)
+			elif id == 117:
+				# CH pump starts
+				starts = parse_u16(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "ch", "flow", "starts"], starts)
+			elif id == 118:
+				# DHW pump/valve starts
+				starts = parse_u16(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "dhw", "flow", "starts"], starts)
+			elif id == 119:
+				# DHW burner starts
+				starts = parse_u16(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "dhw", "burner", "starts"], starts)
+			elif id == 120:
+				# Burner operation hours
+				starts = parse_u16(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "boiler", "burner", "hours"], starts)
+			elif id == 121:
+				# CH pump operation hours
+				hours = parse_u16(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "ch", "flow", "hours"], hours)
+			elif id == 122:
+				# DHW pump/valve operation hours
+				hours = parse_u16(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "dhw", "flow", "hours"], hours)
+			elif id == 123:
+				# DHW burner operation hours
+				hours = parse_u16(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "dhw", "burner", "hours"], hours)
+			elif id == 127:
+				# Slave product version number and type
+				slave_type = int(data[3])
+				slave_version = int(data[4])
+				self.set_value(now, ["opentherm", dev0, "type"], slave_type)
+				self.set_value(now, ["opentherm", dev0, "version"], slave_version)
 
 	def process_zone_temp(self, now, type, dev0, dev1, dev2, data):
 		if dev0 is None:
