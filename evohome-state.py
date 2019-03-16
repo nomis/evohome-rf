@@ -459,7 +459,6 @@ def main_loop(interface, source):
 				(now, packet) = packet.decode("ascii", "replace").split("\n")
 				now = datetime.datetime.fromtimestamp(float(now), datetime.timezone.utc)
 				match = re_message.fullmatch(packet)
-				print(packet)
 				if match:
 					state.process_message(now, **match.groupdict())
 
