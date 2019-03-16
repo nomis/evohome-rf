@@ -9,4 +9,5 @@ re_message = re.compile(r"(?P<rssi>[0-9]{3}|---) +(?P<type>I|RQ|RP|W) +--- +(?P<
 cls_controller = [1]
 cls_sensor = [4, 34]
 cls_actuator = [4]
+cls_opentherm = [10]
 cls_relay = [13]

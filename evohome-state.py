@@ -48,20 +48,41 @@ class Device:
 	def relay(self):
 		return self.cls in cls_relay
 
+	@property
+	def opentherm(self):
+		return self.cls in cls_opentherm
+
 
 def parse_temp(data):
-	temp_c = struct.unpack("!H", data)[0]
+	temp_c = parse_u16(data)
 	if temp_c == 0x7FFF:
 		return None
-	return temp_c/100
+	return temp_c / 100
+
+def parse_u16(data):
+	s = struct.unpack("!H", data)[0]
+	return s
+
+def parse_u8(data):
+	s = struct.unpack("!B", data)[0]
+	return s
+
+def parse_s8(data):
+	s = struct.unpack("!b", data)[0]
+	return s
+
+def parse_f8_8(data):
+	(integer, frac) = struct.unpack("!bB", data)
+	return integer + (frac / 256)
 
 def parse_seconds(data):
-	s = struct.unpack("!H", data)[0]
-	return s / 10
+	return parse_u16(data) / 10
+
+def parse_minutes(data):
+	return parse_u16(data) / 2
 
 def parse_demand(data):
-	pc = struct.unpack("!B", data)[0]
-	return pc / 2
+	return parse_u8(data) / 2
 
 def parse_datetime(data):
 	(mins, hour, day, month, year) = struct.unpack("!BBBBH", data)
@@ -87,11 +108,14 @@ class EvohomeState:
 			0x1060: self.process_battery_info,
 			0x12B0: self.process_zone_window,
 			0x1F09: self.process_controller_interval,
+			0x1FD4: self.process_opentherm_uptime,
+			0x22D9: self.process_opentherm_selected_ch_flow_temperature,
 			0x2309: self.process_set_point,
 			0x2349: self.process_set_point_override,
 			0x2E04: self.process_controller_mode,
 			0x30C9: self.process_zone_temp,
 			0x3150: self.process_zone_demand,
+			0x3220: self.process_opentherm_data,
 			0x3EF0: self.process_relay_state,
 		}
 		self.load_state()
@@ -104,9 +128,9 @@ class EvohomeState:
 			if len(data) != 3:
 				return
 
-			seconds = parse_seconds(data[1:])
-			if seconds is not None:
-				self.set_value(now, ["controller", dev0, "interval_s"], seconds)
+			interval = parse_seconds(data[1:])
+			if interval is not None:
+				self.set_value(now, ["controller", dev0, "interval_s"], interval)
 
 	def process_controller_mode(self, now, type, dev0, dev1, dev2, data):
 		if dev0 is None:
@@ -122,6 +146,79 @@ class EvohomeState:
 			self.set_value(now, ["controller", dev0, "mode", "state"], mode)
 			self.set_value(now, ["controller", dev0, "mode", "until"], until)
 			self.set_value(now, ["controller", dev0, "mode", "persist"], persist)
+
+	def process_opentherm_uptime(self, now, type, dev0, dev1, dev2, data):
+		if dev2 is None:
+			return
+
+		if dev2.opentherm:
+			if len(data) != 3:
+				return
+
+			uptime = parse_minutes(data[1:])
+			if uptime is not None:
+				self.set_value(now, ["opentherm", dev2, "uptime_m"], uptime)
+				self.set_value(now, ["opentherm", dev2, "startup_time"], now - datetime.timedelta(minutes=uptime))
+
+	def process_opentherm_selected_ch_flow_temperature(self, now, type, dev0, dev1, dev2, data):
+		if dev0 is None:
+			return
+
+		if dev0.opentherm:
+			if len(data) != 3:
+				return
+
+			temp = parse_temp(data[1:3])
+			if temp is not None:
+				self.set_value(now, ["opentherm", dev0, "ch", "flow", "set_point_c"], temp)
+
+	def process_opentherm_data(self, now, type, dev0, dev1, dev2, data):
+		if dev0 is None:
+			return
+
+		if dev0.opentherm:
+			if len(data) != 5:
+				return
+
+			id = int(data[2])
+
+			if id == 5:
+				# Application-specific fault flags
+				fault_flags = int(data[3])
+				self.set_value(now, ["opentherm", dev0, "boiler", "faults", "service_request"], (fault_flags & 0x01) != 0)
+				self.set_value(now, ["opentherm", dev0, "boiler", "faults", "lockout_reset"], (fault_flags & 0x02) != 0)
+				self.set_value(now, ["opentherm", dev0, "boiler", "faults", "low_water_pressure"], (fault_flags & 0x04) != 0)
+				self.set_value(now, ["opentherm", dev0, "boiler", "faults", "gas_or_flame"], (fault_flags & 0x08) != 0)
+				self.set_value(now, ["opentherm", dev0, "boiler", "faults", "air_pressure"], (fault_flags & 0x10) != 0)
+				self.set_value(now, ["opentherm", dev0, "boiler", "faults", "water_over_temp"], (fault_flags & 0x20) != 0)
+
+				# OEM fault code
+				fault_code = int(data[4])
+				self.set_value(now, ["opentherm", dev0, "boiler", "faults", "oem_code"], fault_code)
+			elif id == 17:
+				# Relative Modulation Level
+				level = parse_f8_8(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "ch", "modulation", "level"], level)
+			elif id == 18:
+				# CH water pressure
+				pressure = parse_f8_8(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "dhw", "flow", "pressure_bar"], pressure)
+			elif id == 19:
+				# DHW flow rate
+				rate = parse_f8_8(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "dhw", "flow", "rate_l_min"], rate)
+			elif id == 25:
+				# Boiler water temperature
+				temp = parse_f8_8(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "ch", "flow", "temp_c"], temp)
+			elif id == 26:
+				# DHW temperature
+				temp = parse_f8_8(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "dhw", "flow", "temp_c"], temp)
+			elif id == 28:
+				# Return water temperature
+				temp = parse_f8_8(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "ch", "flow", "return_c"], temp)
 
 	def process_zone_temp(self, now, type, dev0, dev1, dev2, data):
 		if dev0 is None:
