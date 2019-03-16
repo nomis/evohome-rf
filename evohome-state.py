@@ -202,6 +202,11 @@ class EvohomeState:
 			elif id == 18:
 				# CH water pressure
 				pressure = parse_f8_8(data[3:5])
+
+				# Nefit EMS-OT incorrectly reads "unknown" 0xFF as 25.5 bar
+				if data[3:5] == b"\x19\x80":
+					pressure = None
+
 				self.set_value(now, ["opentherm", dev0, "dhw", "flow", "pressure_bar"], pressure)
 			elif id == 19:
 				# DHW flow rate
@@ -218,6 +223,11 @@ class EvohomeState:
 			elif id == 28:
 				# Return water temperature
 				temp = parse_f8_8(data[3:5])
+
+				# Nefit EMS-OT incorrectly reads "unknown" 0x8000 as -3276.8C and then converts it into -76.8C
+				if data[3:5] == b"\xB3\x34":
+					temp = None
+
 				self.set_value(now, ["opentherm", dev0, "ch", "flow", "return_c"], temp)
 
 	def process_zone_temp(self, now, type, dev0, dev1, dev2, data):
