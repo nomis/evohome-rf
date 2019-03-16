@@ -207,7 +207,7 @@ class EvohomeState:
 				if data[3:5] == b"\x19\x80":
 					pressure = None
 
-				self.set_value(now, ["opentherm", dev0, "dhw", "flow", "pressure_bar"], pressure)
+				self.set_value(now, ["opentherm", dev0, "ch", "flow", "pressure_bar"], pressure)
 			elif id == 19:
 				# DHW flow rate
 				rate = parse_f8_8(data[3:5])
