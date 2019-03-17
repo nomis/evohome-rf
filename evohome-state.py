@@ -239,6 +239,10 @@ class EvohomeState:
 				# DHW temperature
 				temp = parse_f8_8(data[3:5])
 				self.set_value(now, ["opentherm", dev0, "dhw", "flow", "temp_c"], temp)
+			elif id == 27:
+				# Outside temperature
+				temp = parse_f8_8(data[3:5])
+				self.set_value(now, ["opentherm", dev0, "outside", "temp_c"], temp)
 			elif id == 28:
 				# Return water temperature
 				temp = parse_f8_8(data[3:5])
