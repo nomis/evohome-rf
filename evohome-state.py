@@ -439,6 +439,8 @@ class EvohomeState:
 			self.set_value(now, ["sensor", dev0, "battery"], battery)
 		elif dev0.relay:
 			self.set_value(now, ["relay", dev0, "battery"], battery)
+		elif dev0.opentherm:
+			self.set_value(now, ["opentherm", dev0, "battery"], battery)
 
 	def process_message(self, now, rssi, type, dev0, dev1, dev2, cmd, length, data):
 		rssi = None if rssi == "---" else int(rssi)
@@ -465,6 +467,8 @@ class EvohomeState:
 			self.set_value(now, ["sensor", dev0, "alive"], now)
 		elif dev0.relay:
 			self.set_value(now, ["relay", dev0, "alive"], now)
+		elif dev0.opentherm:
+			self.set_value(now, ["opentherm", dev0, "alive"], now)
 
 		self.commands[cmd](now, type, dev0, dev1, dev2, bytes.fromhex(data))
 		self.save_state()
