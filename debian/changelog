@@ -1,3 +1,9 @@
+evohome-rf (12-1) bionic; urgency=medium
+
+  * Update for bionic
+
+ -- Simon Arlott <ubuntu@sa.me.uk>  Sun, 19 Apr 2020 15:23:49 +0100
+
 evohome-rf (12) xenial; urgency=medium
 
   * Add more OpenTherm data
