@@ -59,7 +59,10 @@ def main_loop(device, interface, ip, debug):
 				(rlist, wlist, xlist) = select.select([input.fd, output], [], [])
 
 				if input.fd in rlist:
-					buffer += os.read(input.fd, 65536)
+					data = os.read(input.fd, 65536)
+					if data == b"":
+						raise EOFError("Serial device")
+					buffer += data
 					lines = buffer.split(b"\r\n")
 					if not buffer.endswith(b"\r\n"):
 						buffer = lines[-1]
