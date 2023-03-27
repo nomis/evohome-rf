@@ -2,8 +2,8 @@ Source: evohome-rf
 Section: misc
 Priority: optional
 Maintainer: Simon Arlott <ubuntu@sa.me.uk>
-Build-Depends: debhelper (>= 9)
-Standards-Version: 3.9.7
+Build-Depends: debhelper (>= 12)
+Standards-Version: 4.1.4
 
 Package: evohome-rf
 Architecture: all
